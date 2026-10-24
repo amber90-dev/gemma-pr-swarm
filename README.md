@@ -44,6 +44,17 @@ streamlit run app.py          # web UI
 python cli.py https://github.com/owner/repo/pull/123   # or the command line
 ```
 
+## ⚙️ CI/CD: automatic review on every PR
+
+The repo ships a ready-made GitHub Action in [`.github/workflows/gemma-pr-swarm.yml`](.github/workflows/gemma-pr-swarm.yml):
+
+1. Add the secret `GEMINI_API_KEY` in **Settings → Secrets and variables → Actions**
+2. Every new or updated PR is reviewed by the swarm automatically
+3. The review is posted as a **PR comment**
+4. If the verdict is **LIKELY SPAM**, the check fails and the PR gets a `spam` label, so it can't be merged by accident. Set `FAIL_ON: "LIKELY SPAM,CHANGES REQUESTED"` for a stricter gate.
+
+It's safe for forks: the workflow never runs the contributor's code. It only reads the diff.
+
 ## 🧩 Add your own agent in 30 seconds
 
 Every agent is one YAML file in [`agents/`](agents/):
@@ -59,8 +70,7 @@ You don't need to change any Python. See [CONTRIBUTING.md](CONTRIBUTING.md) for 
 
 ## 🗺️ Roadmap
 
-- [ ] GitHub Action that auto-reviews every new PR
-- [ ] Post the review to GitHub directly
+- [x] GitHub Action that auto-reviews every PR and posts a comment
 - [ ] Run fully local with Gemma 4 + Ollama
 - [ ] Per-file review for very large PRs
 

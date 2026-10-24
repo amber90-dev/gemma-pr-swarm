@@ -1,0 +1,46 @@
+# Runs the Gemma 4 review swarm on every pull request and posts the review as a comment.
+# Setup: repo Settings → Secrets and variables → Actions → New secret: GEMINI_API_KEY
+name: Gemma PR Swarm
+
+on:
+  # pull_request_target lets PRs from forks (Hacktoberfest!) use the secret.
+  # Safe here because we only check out OUR code (the base branch) and read the
+  # PR diff through the API. The PR's own code is never executed.
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Run the swarm
+        id: swarm
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAIL_ON: "LIKELY SPAM"   # block the merge check for spam PRs
+        run: python cli.py "${{ github.event.pull_request.html_url }}"
+
+      - name: Post review comment
+        if: always() && hashFiles('review.md') != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr comment "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --body-file review.md
+
+      - name: Label spam
+        if: always() && steps.swarm.outputs.verdict == 'LIKELY SPAM'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr edit "${{ github.event.pull_request.number }}" --repo "${{ github.repository }}" --add-label "spam" || true
