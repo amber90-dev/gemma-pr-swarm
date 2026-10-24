@@ -129,7 +129,7 @@ def call_gemma(client: genai.Client, parts: list, retries: int = 5) -> str:
             if attempt == retries - 1:
                 raise
             wait = 3 * (attempt + 1)
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            if any(x in str(e) for x in ("429", "RESOURCE_EXHAUSTED", "500", "INTERNAL", "503", "UNAVAILABLE")):
                 wait = 15 * (attempt + 1)
             time.sleep(wait)
     return ""
