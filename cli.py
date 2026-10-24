@@ -26,10 +26,15 @@ results = swarm.run_swarm(
 verdict = swarm.run_judge(key, pr, results)
 v = verdict.get("verdict", "UNKNOWN")
 
-scores = " · ".join(f"{r.emoji} {r.name} {r.score}/10" for r in results if not r.error)
+scores = " · ".join(
+    f"{r.emoji} {r.name} " + ("⚠️ failed" if r.error else f"{r.score}/10") for r in sorted(results, key=lambda r: r.name)
+)
+failed = [r for r in results if r.error]
+note = (f"\n\n> ⚠️ {len(failed)} agent(s) could not complete (API rate limit). "
+        f"Re-run the workflow to retry.\n" if failed else "")
 review = (
     f"## 🐝 Gemma PR Swarm verdict: **{v}**\n\n"
-    f"<sub>{scores}</sub>\n\n{verdict.get('comment', '')}\n\n"
+    f"<sub>{scores}</sub>{note}\n\n{verdict.get('comment', '')}\n\n"
     f"---\n<sub>Reviewed by a swarm of Gemma 4 agents · "
     f"[Gemma PR Swarm](https://github.com/) · AI review, a human maintainer makes the final call.</sub>\n"
 )

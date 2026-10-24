@@ -120,15 +120,18 @@ def parse_json(text: str) -> dict:
         raise
 
 
-def call_gemma(client: genai.Client, parts: list, retries: int = 3) -> str:
+def call_gemma(client: genai.Client, parts: list, retries: int = 5) -> str:
     for attempt in range(retries):
         try:
             r = client.models.generate_content(model=MODEL, contents=parts)
             return r.text or ""
-        except Exception as e:  # rate limits on free tier → back off and retry
+        except Exception as e:  # free-tier rate limits (429) → back off and retry
             if attempt == retries - 1:
                 raise
-            time.sleep(2 * (attempt + 1) + (5 if "429" in str(e) else 0))
+            wait = 3 * (attempt + 1)
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                wait = 15 * (attempt + 1)
+            time.sleep(wait)
     return ""
 
 
@@ -154,8 +157,12 @@ def run_swarm(api_key: str, pr: PullRequest, images=None, on_done=None) -> list[
     client = genai.Client(api_key=api_key)
     agents = [a for a in load_agents() if images or not a.get("needs_image")]
     results = []
-    with ThreadPoolExecutor(max_workers=len(agents)) as pool:
-        futures = [pool.submit(run_agent, client, a, pr, images) for a in agents]
+    workers = int(os.getenv("SWARM_WORKERS", "3"))  # free tier: ~3 parallel calls is safe
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = []
+        for i, a in enumerate(agents):
+            futures.append(pool.submit(run_agent, client, a, pr, images))
+            time.sleep(1.5)  # stagger starts so they don't all hit the API in the same second
         for f in as_completed(futures):
             r = f.result()
             results.append(r)
